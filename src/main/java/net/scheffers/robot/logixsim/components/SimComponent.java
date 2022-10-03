@@ -1,7 +1,8 @@
 package net.scheffers.robot.logixsim.components;
 
 import net.scheffers.robot.logixsim.Simulation;
-import net.scheffers.robot.logixsim.simulation.SimPin;
+import net.scheffers.robot.logixsim.wires.Direction;
+import net.scheffers.robot.logixsim.wires.Pin;
 
 import java.awt.*;
 import java.awt.event.MouseEvent;
@@ -26,7 +27,7 @@ public abstract class SimComponent {
 	public boolean mouseLeftDown, mouseRightDown;
 	
 	/** The pins on this component. */
-	public List<SimPin> pins;
+	private final List<Pin> pins;
 	
 	/**
 	 * The basic component constructor.
@@ -65,8 +66,10 @@ public abstract class SimComponent {
 		drawInternal(g, asGhost);
 		g.setColor(Color.CYAN);
 		if (selected) {
-			g.drawRoundRect(0, 0, (int) (width * 10), (int) (height * 10), 5, 5);
+			g.drawRoundRect(0, 0, width * 10, height * 10, 5, 5);
 		}
+		
+		pins.forEach(pin -> pin.draw(this, g));
 		
 		g.setTransform(pre);
 	}
@@ -95,6 +98,14 @@ public abstract class SimComponent {
 	public void mouseUp(MouseEvent e) {}
 	/** Called when the mouse is clicked on this component without moving the mouse too far. */
 	public void mouseClick(MouseEvent e) {}
+	
+	
+	/** Adds a pin to this component. */
+	protected Pin addPin(int x, int y, Direction direction) {
+		Pin pin = new Pin(x, y, direction);
+		pins.add(pin);
+		return pin;
+	}
 	
 	
 	/** Returns whether the given point is contained in this component's bounding box. */
