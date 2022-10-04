@@ -111,9 +111,11 @@ public class Pin implements WireAttachable {
 	/** Called when a WireAttachable is joined with another, which is not necessarily a Wire. */
 	@Override
 	public void join(WireAttachable other) {
-		if (other instanceof Wire wire) {
+		if (other instanceof Wire) {
+			Wire wire = (Wire) other;
 			if (net != wire.net) wire.connect(this);
-		} else if (other instanceof Pin pin) {
+		} else if (other instanceof Pin) {
+			Pin pin = (Pin) other;
 			if (pin.net != null && pin.net != net) {
 				pin.net.connect(this);
 				net = pin.net;

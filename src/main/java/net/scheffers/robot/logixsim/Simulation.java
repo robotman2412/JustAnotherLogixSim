@@ -146,7 +146,12 @@ public class Simulation extends JPanel implements MouseListener, MouseMotionList
 	
 	/** Checks whether the bounding box of a component is on screen. */
 	public boolean isOnScreen(SimComponent component) {
-		return gridVisiblePart.intersects(component.x, component.y, component.width, component.height);
+		if (component instanceof Wire) {
+			Wire wire = (Wire) component;
+			return gridVisiblePart.intersectsLine(wire.start.x, wire.start.y, wire.end.x, wire.end.y);
+		} else {
+			return gridVisiblePart.intersects(component.x, component.y, component.width, component.height);
+		}
 	}
 	
 	/** Draws the grid lines. */
@@ -268,7 +273,8 @@ public class Simulation extends JPanel implements MouseListener, MouseMotionList
 		
 		for (SimComponent component : components) {
 			if (!component.visible) continue;
-			if (component instanceof Wire wire) {
+			if (component instanceof Wire) {
+				Wire wire = (Wire) component;
 				// Check wires.
 				if (wire.contains(x, y)) return wire;
 				
@@ -288,7 +294,8 @@ public class Simulation extends JPanel implements MouseListener, MouseMotionList
 		
 		for (SimComponent component : components) {
 			if (!component.visible) continue;
-			if (component instanceof Wire wire) {
+			if (component instanceof Wire) {
+				Wire wire = (Wire) component;
 				// Check wires.
 				if (wire.contains(x, y)) {
 					if (point != null) point.join(wire);
@@ -371,6 +378,11 @@ public class Simulation extends JPanel implements MouseListener, MouseMotionList
 			// Handle click events.
 			if (isClickValid) {
 				onClick(e);
+			}
+			
+			// Selection?
+			if (isSelectValid) {
+				
 			}
 		}
 		if (e.getButton() == MouseEvent.BUTTON2) {

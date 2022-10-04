@@ -14,8 +14,6 @@ public class Wire extends SimComponent implements WireAttachable {
 	public Point start;
 	/** The end point of this wire. */
 	public Point end;
-	/** A Line2D used for testing whether a point is on this wire. */
-	public Line2D lineBounds;
 	
 	/** The wire class is almost entirely handled by Simulation. */
 	public Wire(Simulation parent) {
@@ -23,7 +21,6 @@ public class Wire extends SimComponent implements WireAttachable {
 		start		= new Point(0, 0);
 		end			= new Point(0, 0);
 		net			= new WireNet();
-		lineBounds	= new Line2D.Float(start, end);
 		net.wires.add(this);
 	}
 	
@@ -33,7 +30,6 @@ public class Wire extends SimComponent implements WireAttachable {
 		this.start	= start.getLocation();
 		this.end	= end.getLocation();
 		net			= new WireNet();
-		lineBounds	= new Line2D.Float(start, end);
 		net.wires.add(this);
 		calculateBounds();
 	}
@@ -84,21 +80,44 @@ public class Wire extends SimComponent implements WireAttachable {
 		y		= y0;
 		width	= x1 - x0;
 		height	= y1 - y0;
-		
-		// Construct line.
-		lineBounds.setLine(start, end);
+	}
+	
+	/** A point to point square distance. */
+	protected static float sqrDist(float x0, float y0, float x1, float y1) {
+		float dx = x1 - x0;
+		float dy = y1 - y0;
+		return dx * dx + dy * dy;
 	}
 	
 	/** Whether a point is on this wire. */
 	@Override
 	public boolean contains(float x, float y) {
-		// TODO: Include margin?
+		float limit    = 0.25f;
+		float sqrLimit = limit * limit;
 		
-		// Step 1: Bounding box check.
-		if (!super.contains(x, y)) return false;
+		// Initial box check.
+		if (x < this.x - limit || x > this.x + height || y < this.y || y > this.y + height) {
+			return false;
+		}
 		
-		// Step 2: Line check.
-		return lineBounds.ptLineDistSq(x, y) < 0.25;
+		// Vertical check.
+		if (this.width == 0) {
+			// Smooth the edges.
+			if (y < this.y) return sqrDist(x, y, this.x, this.y) < sqrLimit;
+			if (y > this.y + this.height) return sqrDist(x, y, this.x, this.y + this.height) < sqrLimit;
+			
+			// It is in the middle.
+			return Math.abs(x - this.x) < limit;
+		}
+		
+		// Line tangent based distance check.
+		float dy	= y - this.y;
+		float dx	= x - this.x;
+		float rc	= dy / dx;
+		float trc	= -1 / rc;
+		
+		// Calculate intersection.
+		float ix    =
 	}
 	
 	/** Connect the wire to another wire. */
@@ -128,9 +147,11 @@ public class Wire extends SimComponent implements WireAttachable {
 	/** Called when a WireAttachable is joined with another, which is not necessarily a Wire. */
 	@Override
 	public void join(WireAttachable other) {
-		if (other instanceof Wire wire) {
+		if (other instanceof Wire) {
+			Wire wire = (Wire) other;
 			if (net != wire.net) connect(wire);
-		} else if (other instanceof Pin pin) {
+		} else if (other instanceof Pin) {
+			Pin pin = (Pin) other;
 			if (net != pin.net) connect(pin);
 		}
 	}
