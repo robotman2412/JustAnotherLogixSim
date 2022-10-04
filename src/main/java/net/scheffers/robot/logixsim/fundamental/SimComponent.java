@@ -1,8 +1,6 @@
-package net.scheffers.robot.logixsim.components;
+package net.scheffers.robot.logixsim.fundamental;
 
 import net.scheffers.robot.logixsim.Simulation;
-import net.scheffers.robot.logixsim.wires.Direction;
-import net.scheffers.robot.logixsim.wires.Pin;
 
 import java.awt.*;
 import java.awt.event.MouseEvent;
@@ -64,12 +62,15 @@ public abstract class SimComponent {
 		
 		g.setColor(Color.BLACK);
 		drawInternal(g, asGhost);
-		g.setColor(Color.CYAN);
-		if (selected) {
-			g.drawRoundRect(0, 0, width * 10, height * 10, 5, 5);
-		}
 		
-		pins.forEach(pin -> pin.draw(this, g));
+		if (!(this instanceof Wire)) {
+			g.setColor(Color.CYAN);
+			if (selected) {
+				g.drawRoundRect(0, 0, width * 10, height * 10, 5, 5);
+			}
+			
+			pins.forEach(pin -> pin.draw(g));
+		}
 		
 		g.setTransform(pre);
 	}
@@ -78,12 +79,8 @@ public abstract class SimComponent {
 	protected abstract void drawInternal(Graphics2D g, boolean asGhost);
 	
 	
-	/**
-	 * Obtain a copy of this component for placing on the canvas.
-	 * It is up to this method to determine whether to snap to grid or freely place.
-	 */
+	/** Obtain a copy of this component for placing on the canvas. */
 	public abstract SimComponent getCopy(Simulation to, int x, int y);
-	
 	/** Called by Simulation when the component is newly placed. */
 	public void onAdded() {}
 	/** Called by Simulation just before the component gets removed. */
@@ -102,15 +99,40 @@ public abstract class SimComponent {
 	
 	/** Adds a pin to this component. */
 	protected Pin addPin(int x, int y, Direction direction) {
-		Pin pin = new Pin(x, y, direction);
+		Pin pin = new Pin(this, x, y, direction);
 		pins.add(pin);
+		parent.joinWirePoints(this.x + x, this.y + y);
 		return pin;
+	}
+	
+	/** Gets an iterator for the pins list. */
+	protected Iterable<Pin> iteratePins() {
+		//noinspection FunctionalExpressionCanBeFolded
+		return pins::iterator;
+	}
+	
+	/** Removes a pin from the component. */
+	protected void removePin(Pin pin) {
+		if (pin.net != null) pin.net.remove(pin);
+		pins.remove(pin);
 	}
 	
 	
 	/** Returns whether the given point is contained in this component's bounding box. */
 	public boolean contains(float x, float y) {
 		return this.x <= x && this.x + this.width >= x && this.y <= y && this.y + this.height >= y;
+	}
+	
+	/** Finds a pin with given absolute coordinates. */
+	public Pin findPin(int x, int y) {
+		x -= this.x;
+		y -= this.y;
+		for (Pin pin : pins) {
+			if (pin.x == x && pin.y == y) {
+				return pin;
+			}
+		}
+		return null;
 	}
 	
 }

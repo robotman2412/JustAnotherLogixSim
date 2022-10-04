@@ -1,7 +1,6 @@
 package net.scheffers.robot.logixsim;
 
-import net.scheffers.robot.logixsim.components.SimComponent;
-import net.scheffers.robot.logixsim.components.SimComponentText;
+import net.scheffers.robot.logixsim.fundamental.*;
 
 import javax.swing.*;
 import java.awt.*;
@@ -43,11 +42,22 @@ public class Simulation extends JPanel implements MouseListener, MouseMotionList
 	
 	/** Current biggest on-screen part of the grid. */
 	protected Rectangle2D	gridVisiblePart;
+	/** Whether the canvas needs a redrawing. */
+	public boolean dirty;
 	
 	/** All components on the canvas. */
-	protected final List<SimComponent> components;
+	protected final List<SimComponent>	components;
+	
 	/** The component to place at the cursor, if any. */
-	public SimComponent toPlace;
+	public SimComponent		toPlace;
+	/** The component to drag around, if any. */
+	public SimComponent		toDrag;
+	/** The wire to drag around, if any. */
+	public Wire				wireToDrag;
+	/** Whether to drag wire start instead of end. */
+	public boolean			dragWireStart;
+	/** The connectable point that the cursor is near, if any. */
+	public WireAttachable wirable;
 	
 	/** The parent window for this simulation. */
 	public final LogixSimMain parent;
@@ -64,7 +74,6 @@ public class Simulation extends JPanel implements MouseListener, MouseMotionList
 		setFocusable(true);
 		
 		components = new ArrayList<>();
-		toPlace = new SimComponentText(this, 2, 2, "Hello, Logix!");
 	}
 	
 	// region rendering
@@ -104,6 +113,7 @@ public class Simulation extends JPanel implements MouseListener, MouseMotionList
 			if (component.visible) component.draw(g, false);
 		});
 		
+		
 		// Placing components.
 		if (toPlace != null && isHovered) {
 			toPlace.x = (int) Math.floor(cursorX);
@@ -111,8 +121,22 @@ public class Simulation extends JPanel implements MouseListener, MouseMotionList
 			toPlace.draw(g, true);
 		}
 		
+		// Wire attaching.
+		if (wirable != null) {
+			Point attachPoint = wirable.getClosestAttachable(cursorX, cursorY);
+			g.setColor(Color.BLUE);
+			g.drawOval(attachPoint.x * 10 - 5, attachPoint.y * 10 - 5, 10, 10);
+		}
+		
+		// Selection box.
+		if (isSelectValid) {
+			drawSelection(g);
+		}
+		
 		// Cleanup.
 		g.setTransform(pre);
+		
+		dirty = false;
 	}
 	
 	/** Reevaluates for all components whether they are visible. */
@@ -142,6 +166,29 @@ public class Simulation extends JPanel implements MouseListener, MouseMotionList
 			if (x % multiplier == 0)
 				g.drawRect((int) ((x - scrollX) * gridScale), 0, 0, g.getClipBounds().height);
 		}
+	}
+	
+	/** Draws the selection box. */
+	public void drawSelection(Graphics2D g) {
+		// Sort coords because Graphics is very incredibly stupid.
+		int x0, x1;
+		if (cursorStartX < cursorX) {
+			x0 = (int) (cursorStartX * 10); x1 = (int) (cursorX * 10);
+		} else {
+			x1 = (int) (cursorStartX * 10); x0 = (int) (cursorX * 10);
+		}
+		
+		int y0, y1;
+		if (cursorStartY < cursorY) {
+			y0 = (int) (cursorStartY * 10); y1 = (int) (cursorY * 10);
+		} else {
+			y1 = (int) (cursorStartY * 10); y0 = (int) (cursorY * 10);
+		}
+		
+		g.setColor(new Color(0, 127, 255, 64));
+		g.fillRect(x0, y0, x1 - x0, y1 - y0);
+		g.setColor(new Color(0, 127, 255));
+		g.drawRect(x0, y0, x1 - x0, y1 - y0);
 	}
 	// endregion rendering
 	
@@ -199,17 +246,63 @@ public class Simulation extends JPanel implements MouseListener, MouseMotionList
 			
 		} else {
 			// Modify selection.
-			AtomicBoolean dirty = new AtomicBoolean(false);
 			components.forEach(component -> {
 				// Only evaluate when it is on screen.
 				boolean next = component.visible && component.contains(cursorX, cursorY);
-				if (next != component.selected) dirty.set(true);
+				if (e.isShiftDown()) next ^= component.selected;
+				if (next != component.selected) dirty = true;
 				if (next) {
 					component.mouseClick(e);
 				}
 				component.selected = next;
 			});
-			if (dirty.get()) repaint();
+			if (dirty) repaint();
+		}
+	}
+
+	/** Finds the closest object to which a wire could be attached. */
+	public WireAttachable findClosestWirePoint() {
+		// Round cursor position.
+		int x = Math.round(cursorX);
+		int y = Math.round(cursorY);
+		
+		for (SimComponent component : components) {
+			if (!component.visible) continue;
+			if (component instanceof Wire wire) {
+				// Check wires.
+				if (wire.contains(x, y)) return wire;
+				
+			} else if (component.contains(x, y)) {
+				// Check components.
+				Pin pin = component.findPin(x, y);
+				if (pin != null) return pin;
+			}
+		}
+		
+		return null;
+	}
+	
+	/** Joins all wire points at the cursor position. */
+	public void joinWirePoints(int x, int y) {
+		WireAttachable point = null;
+		
+		for (SimComponent component : components) {
+			if (!component.visible) continue;
+			if (component instanceof Wire wire) {
+				// Check wires.
+				if (wire.contains(x, y)) {
+					if (point != null) point.join(wire);
+					point = wire;
+				}
+				
+			} else if (component.contains(x, y)) {
+				// Check components.
+				Pin pin = component.findPin(x, y);
+				if (pin != null) {
+					if (point != null) point.join(pin);
+					point = pin;
+				}
+			}
 		}
 	}
 	// endregion editing
@@ -237,7 +330,8 @@ public class Simulation extends JPanel implements MouseListener, MouseMotionList
 				if (component.visible && component.contains(cursorX, cursorY)) {
 					component.mouseLeftDown  = e.getButton() == MouseEvent.BUTTON1;
 					component.mouseRightDown = e.getButton() == MouseEvent.BUTTON3;
-					isSelectValid &= !component.mouseDown(e);
+					boolean consumed = component.mouseDown(e);
+					isSelectValid &= !consumed;
 				}
 			});
 		}
@@ -252,6 +346,15 @@ public class Simulation extends JPanel implements MouseListener, MouseMotionList
 		rawCursorY = e.getY();
 		if (!isPanning) {
 			recalculateCursor();
+			
+			if (wireToDrag != null) {
+				// Stop, drag, the wire.
+				joinWirePoints(Math.round(cursorX), Math.round(cursorY));
+				wireToDrag = null;
+				
+				// Evaluate draggable for CONTINUATION.
+				wirable = findClosestWirePoint();
+			}
 			
 			// Send mouseup events to all affected components.
 			components.forEach(component -> {
@@ -273,6 +376,8 @@ public class Simulation extends JPanel implements MouseListener, MouseMotionList
 		if (e.getButton() == MouseEvent.BUTTON2) {
 			isPanning = false;
 		}
+		
+		isSelectValid = false;
 		repaint();
 	}
 	
@@ -285,8 +390,29 @@ public class Simulation extends JPanel implements MouseListener, MouseMotionList
 		if (isPanning) panGrid();
 		else recalculateCursor();
 		
+		if (wireToDrag != null) {
+			// Move around wire.
+			Point toDrag = dragWireStart ? wireToDrag.start : wireToDrag.end;
+			toDrag.x = Math.round(cursorX);
+			toDrag.y = Math.round(cursorY);
+			wireToDrag.calculateBounds();
+			isSelectValid = false;
+		}
+		
 		if (Math.round(cursorStartX) != Math.round(cursorX) || Math.round(cursorStartY) != Math.round(cursorY)) {
 			isClickValid = false;
+			
+			if (wirable != null) {
+				// Start wiring.
+				wireToDrag = new Wire(this,
+						wirable.getClosestAttachable(cursorX, cursorY),
+						new Point(Math.round(cursorX), Math.round(cursorY))
+				);
+				wirable.attachWire(wireToDrag, wireToDrag.start);
+				components.add(wireToDrag);
+				dragWireStart = false;
+				wirable = null;
+			}
 		}
 		
 		repaint();
@@ -294,11 +420,34 @@ public class Simulation extends JPanel implements MouseListener, MouseMotionList
 	
 	@Override
 	public void mouseMoved(MouseEvent e) {
+		Point prevPoint = wirable != null ? wirable.getClosestAttachable(cursorX, cursorY) : null;
+		WireAttachable prev = wirable;
+		
 		isHovered = true;
 		rawCursorX = e.getX();
 		rawCursorY = e.getY();
 		recalculateCursor();
-		repaint();
+		
+		if (wireToDrag != null) {
+			// Move around wire.
+			Point toDrag = dragWireStart ? wireToDrag.start : wireToDrag.end;
+			toDrag.x = Math.round(cursorX);
+			toDrag.y = Math.round(cursorY);
+			wireToDrag.calculateBounds();
+			repaint();
+			
+		} else if (toPlace == null) {
+			// Check for wire drag stuff.
+			wirable = findClosestWirePoint();
+			
+			// Check for redraw.
+			Point point = wirable != null ? wirable.getClosestAttachable(cursorX, cursorY) : null;
+			if (wirable != prev || prevPoint != point) repaint();
+			
+		} else {
+			// There is stuff to place, so repaint.
+			repaint();
+		}
 	}
 	
 	@Override

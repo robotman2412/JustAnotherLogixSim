@@ -1,5 +1,8 @@
 package net.scheffers.robot.logixsim;
 
+import net.scheffers.robot.logixsim.components.SimComponentButton;
+import net.scheffers.robot.logixsim.components.SimComponentLED;
+
 import javax.swing.*;
 import java.awt.*;
 import java.awt.event.*;
@@ -74,6 +77,9 @@ public class LogixSimMain {
 			toolsPanel.add(toolTest2 = new JButton("Light"));
 			toolTest1.addActionListener(e -> {
 				simulation.toPlace = new SimComponentButton(simulation, 0, 0);
+			});
+			toolTest2.addActionListener(e -> {
+				simulation.toPlace = new SimComponentLED(simulation, 0, 0);
 			});
 			
 			// Focus on editor.

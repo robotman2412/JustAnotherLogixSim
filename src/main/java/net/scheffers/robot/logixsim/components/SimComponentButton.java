@@ -1,8 +1,9 @@
-package net.scheffers.robot.logixsim;
+package net.scheffers.robot.logixsim.components;
 
-import net.scheffers.robot.logixsim.components.SimComponent;
-import net.scheffers.robot.logixsim.wires.Direction;
-import net.scheffers.robot.logixsim.wires.Pin;
+import net.scheffers.robot.logixsim.Simulation;
+import net.scheffers.robot.logixsim.fundamental.Direction;
+import net.scheffers.robot.logixsim.fundamental.Pin;
+import net.scheffers.robot.logixsim.fundamental.SimComponent;
 
 import java.awt.*;
 import java.awt.event.MouseEvent;

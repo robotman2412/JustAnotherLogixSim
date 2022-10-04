@@ -1,10 +1,10 @@
-package net.scheffers.robot.logixsim.wires;
+package net.scheffers.robot.logixsim.fundamental;
 
 import java.awt.*;
 import java.util.ArrayList;
 import java.util.List;
 
-public class WireNet {
+class WireNet {
 	
 	/** The current value that is on this wire net. */
 	private boolean value;
@@ -13,23 +13,32 @@ public class WireNet {
 	public List<Pin> outputs;
 	/** The pins with input capability on this network. */
 	public List<Pin> inputs;
+	/** All wire members of this net. */
+	public List<Wire> wires;
 	
 	public WireNet() {
 		outputs = new ArrayList<>();
 		inputs = new ArrayList<>();
+		wires = new ArrayList<>();
 	}
 	
 	/** Connects this wire net to a new pin. */
 	public void connect(Pin pin) {
-		
+		outputs.remove(pin);
+		inputs.remove(pin);
+		if (pin.getDirection().isOutput) outputs.add(pin);
+		if (pin.getDirection().isInput) inputs.add(pin);
 	}
 	
 	/** Merges this wire net with another. */
 	public void merge(WireNet other) {
-		outputs.addAll(other.outputs);
-		inputs.addAll(other.inputs);
 		other.outputs.forEach(pin -> pin.net = this);
 		other.inputs.forEach(pin -> pin.net = this);
+		other.wires.forEach(wire -> wire.net = this);
+		outputs.addAll(other.outputs);
+		inputs.addAll(other.inputs);
+		wires.addAll(other.wires);
+		value |= other.value;
 	}
 	
 	/** Called to notify that a pin changed direction modes. */
@@ -77,6 +86,11 @@ public class WireNet {
 		} else {
 			return new Color(0, 64, 0);
 		}
+	}
+	
+	/** Removes a pin from this net. */
+	public void remove(Pin pin) {
+	
 	}
 	
 }

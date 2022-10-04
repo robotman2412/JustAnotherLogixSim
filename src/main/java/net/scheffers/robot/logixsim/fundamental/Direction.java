@@ -1,4 +1,4 @@
-package net.scheffers.robot.logixsim.wires;
+package net.scheffers.robot.logixsim.fundamental;
 
 public enum Direction {
 	INPUT	(true,	false),

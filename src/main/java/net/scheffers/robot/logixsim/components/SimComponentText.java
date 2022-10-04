@@ -1,6 +1,7 @@
 package net.scheffers.robot.logixsim.components;
 
 import net.scheffers.robot.logixsim.Simulation;
+import net.scheffers.robot.logixsim.fundamental.SimComponent;
 
 import java.awt.*;
 import java.awt.font.FontRenderContext;
